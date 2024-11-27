@@ -20,7 +20,7 @@ import json
 import logging
 from openai import OpenAI
 from pydantic import BaseModel, Field, PrivateAttr
-from typing import Callable, List, Dict, Any
+from typing import Callable, List, Dict, Any, Optional
 
 from utils import get_function_info
 
@@ -28,7 +28,7 @@ from utils import get_function_info
 class Agent(BaseModel):
     """Create an AI agent.
 
-    A class representing an agent that can delegate tasks to OpenAI's API and
+    A class representing an agent that can take up specific roles and also
     manage tool calls.
     """
 
@@ -36,8 +36,8 @@ class Agent(BaseModel):
     role_description: str = Field(...)
     functions: List[Callable] = Field(default_factory=list)
     api_key: str = Field(...)
-    base_url: str = Field(...)
-    model: str = Field(default="gpt-4o-mini")
+    base_url: Optional[str] = Field(default=None)
+    model: str = Field(...)
     messages: List[Dict[str, str]] = Field(default_factory=list)
 
     _available_functions: Dict[str, Callable] = PrivateAttr()
@@ -53,15 +53,14 @@ class Agent(BaseModel):
         self._functions_info = [
             get_function_info(func) for func in self.functions
         ]
+
         self.messages = [{
             'role': 'system',
             'content': f"You are a {self.role}. {self.role_description}"
         }]
         self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
-        print(self._functions_info)
-
-    def call_openai_api(self, messages: List[Dict[str, str]]) -> Any:
+    def call_llm(self, messages: List[Dict[str, str]]) -> Any:
         """Get the models response based on the provided messages.
 
         Args:
@@ -71,12 +70,18 @@ class Agent(BaseModel):
             Any: The API response or an error message.
         """
         try:
-            return self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=self._functions_info,
-                tool_choice="auto",
-            )
+            if len(self.functions) > 0:
+                return self._client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=self._functions_info,
+                    tool_choice="auto",
+                )
+            else:
+                return self._client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                )
         except Exception as e:
             return f"Error during API call: {e}"
 
@@ -137,7 +142,7 @@ class Agent(BaseModel):
             str: The assistant's final response.
         """
         logging.debug("Following up with response")
-        follow_up_response = self.call_openai_api(self.messages)
+        follow_up_response = self.call_llm(self.messages)
         if isinstance(follow_up_response, str):
             logging.debug(follow_up_response)
             return follow_up_response
@@ -172,8 +177,8 @@ class Agent(BaseModel):
         # Add user message
         self.messages.append({"role": "user", "content": user_input})
 
-        # Call OpenAI API for the initial response
-        response = self.call_openai_api(self.messages)
+        # Call LLM API for the initial response
+        response = self.call_llm(self.messages)
         if isinstance(response, str):
             # Return error if initial API call failed
             error_message = response
