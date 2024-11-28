@@ -2,6 +2,7 @@
 
 from typing import List, Callable
 from pydantic import Field
+from opentelemetry.trace import Status, StatusCode
 
 from base import BaseAgent
 
@@ -70,10 +71,12 @@ class AgentManager(BaseAgent):
             if not agent:
                 return f"No agent found with role '{role}'."
 
-            span.set_attribute("agent.name", agent.role)
+            span.add_event("Calling agent")
+            span.set_attribute("agent.role", agent.role)
             agent_response = agent(task)
             span.set_attribute("agent.response", agent_response)
 
             self.agent_messages += agent_response
 
+            span.set_status(Status(StatusCode.OK))
             return agent_response

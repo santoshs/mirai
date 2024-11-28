@@ -70,3 +70,13 @@ class TestAgent(unittest.TestCase):
 
         self.log.debug(response)
         self.assertRegex(response, "^Hiya Popeye.*Nor a drop to drink.*$")
+
+    def test_history(self):
+        user_input = "What cartoon character I asked you to greet?"
+        self.test_tool_calling()
+        self.log.debug(user_input)
+
+        response = self.agent(user_input)
+
+        self.log.debug(response)
+        self.assertTrue("Popeye" in response)
