@@ -25,7 +25,7 @@ def get_function_info(func: Callable) -> Dict[str, Any]:
         "type": "function",
         "function": {
             "name": func.__name__,
-            "description": func.__doc__ or "",
+            "description": func.__doc__,
             "parameters": {
                 "type": "object",
                 "properties": params,

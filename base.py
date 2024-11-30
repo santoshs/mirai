@@ -1,7 +1,7 @@
 """Base class for agent and manger."""
 
-from pydantic import BaseModel, Field, PrivateAttr
-from typing import Callable, List, Dict, Any, Optional
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from typing import Callable, List, Dict, Any, Optional, Self
 from openinference.semconv.trace import SpanAttributes
 from opentelemetry.trace import Status, StatusCode
 from opentelemetry.trace import Tracer
@@ -9,15 +9,15 @@ from opentelemetry import trace
 from openai import OpenAI
 import json
 
-from utils import get_function_info
+from .utils import get_function_info
 
 
 class BaseAgent(BaseModel):
     """Base class for agent and Manager."""
 
-    api_key: str = Field(...)
+    api_key: Optional[str] = Field(default=None)
     base_url: Optional[str] = Field(default=None)
-    model: str = Field(...)
+    model: Optional[str] = Field(default=None)
     messages: List[Dict[str, str]] = Field(default_factory=list)
     functions: List[Callable] = Field(default_factory=list)
     run: Optional[Callable] = Field(default=None)
@@ -28,6 +28,14 @@ class BaseAgent(BaseModel):
     _client: OpenAI = PrivateAttr()
     _complete: bool = PrivateAttr(default=False)
     _iterative_mode: bool = PrivateAttr(default=False)
+
+    @model_validator(mode='after')
+    def check_fields(self) -> Self:
+        """Ensure proper values are provided."""
+        if not self.run and not (self.api_key and self.model):
+            raise ValueError("Either 'run' must be provided, or both 'api_key' and 'model' must be specified.")
+
+        return self
 
     def __init__(self, **data):
         """Initialize the Agent with the provided data."""
@@ -41,6 +49,7 @@ class BaseAgent(BaseModel):
         self._functions_info = [
             get_function_info(func) for func in self.functions
         ]
+
         self._available_functions = {
             func.__name__: func for func in self.functions
         }
@@ -82,7 +91,7 @@ class BaseAgent(BaseModel):
                 try:
                     # Call the function with provided arguments
                     result = func(**arguments)
-                    span.set_attribute("agent.response", result)
+                    span.set_attribute(SpanAttributes.OUTPUT_VALUE, result)
                     span.set_status(Status(StatusCode.OK))
                     return tool_id, result
                 except Exception as e:

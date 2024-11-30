@@ -18,7 +18,7 @@ Example usage:
 
 from pydantic import Field
 
-from base import BaseAgent
+from .base import BaseAgent
 
 
 class Agent(BaseAgent):

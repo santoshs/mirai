@@ -4,7 +4,7 @@ from typing import List, Callable
 from pydantic import Field
 from opentelemetry.trace import Status, StatusCode
 
-from base import BaseAgent
+from .base import BaseAgent
 
 
 ORCHESTRATOR_PROMPT = """You are the Orchestrator in a multi-agent system,
@@ -16,10 +16,12 @@ not offer any additional assistance or ask if further clarification is needed."
 
 Responsibilities:
 
+- Query Relevance: If there is a appropriate agent available, use it to check the relevance/validity of the query provided by the user.
 - Analyze and Route Tasks: Carefully read the task descriptions provided and determine which agent or group of agents should handle each request.
 - Delegate Responsibilities: Based on the nature of the task, either delegate it to a single agent, broadcast it to multiple agents for feedback, or coordinate complex tasks that require input from multiple agents.
 - Facilitate Agent Communication: When necessary, relay information between agents to ensure tasks are handled efficiently, and relevant insights or updates are shared effectively.
 - Provide Context: Offer each agent relevant task context, helping them understand the problem at hand so they can respond appropriately.
+- Review Result: Review the provided solution/answer, if available by using one of the relevant agents.
 - Summarize Results: Gather responses from agents and present consolidated, clear answers or next steps.
 
 Agents:
@@ -46,8 +48,6 @@ class AgentManager(BaseAgent):
 
     def __init__(self, **data):
         """Initialize the Agent with the provided data."""
-        # workaround to avoid pydantic errors and also to make sure BaseAgent
-        # sees the functions list.
         super().__init__(**data)
         self.functions = [self.transfer_to_agent]
         self._agents = {agent.role.lower(): agent for agent in self.agents}
