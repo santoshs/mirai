@@ -34,7 +34,5 @@ class Agent(BaseAgent):
     def __init__(self, **data):
         """Initialize the Agent with the provided data."""
         super().__init__(**data)
-        self.messages = [{
-            'role': 'system',
-            'content': f"You are a {self.role}. {self.role_description}"
-        }]
+        self._system_prompt = f"You are a {self.role}. {self.role_description}"
+        self.clear_history()

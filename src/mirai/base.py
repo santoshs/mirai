@@ -1,15 +1,24 @@
 """Base class for agent and manger."""
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
-from typing import Callable, List, Dict, Any, Optional, Self
+from typing import Callable, List, Dict, Any, Optional
 from openinference.semconv.trace import SpanAttributes
 from opentelemetry.trace import Status, StatusCode
 from opentelemetry.trace import Tracer
 from opentelemetry import trace
 from openai import OpenAI
 import json
+import sys
 
 from .utils import get_function_info
+
+# Check Python version and define Self accordingly
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing import TypeVar
+    T = TypeVar("T", bound="BaseAgent")
+    Self = T
 
 
 class BaseAgent(BaseModel):
@@ -28,6 +37,7 @@ class BaseAgent(BaseModel):
     _client: OpenAI = PrivateAttr()
     _complete: bool = PrivateAttr(default=False)
     _iterative_mode: bool = PrivateAttr(default=False)
+    _system_prompt: str = PrivateAttr(default="You are a helpful assistant.")
 
     @model_validator(mode='after')
     def check_fields(self) -> Self:
@@ -176,3 +186,16 @@ class BaseAgent(BaseModel):
                     return result  # Final response or error
                 if not self._iterative_mode:
                     return self._follow_up_with_results()
+
+    def clear_history(self):
+        """Clear history."""
+        self.messages = [{
+            'role': 'system',
+            'content': self._system_prompt
+        }]
+
+        return
+
+    def add_history(self, messages):
+        """Add history."""
+        self.messages.extend(messages)

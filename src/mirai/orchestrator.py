@@ -56,10 +56,8 @@ class AgentManager(BaseAgent):
         for agent in self.agents:
             agents += f"\n- {agent.role}"
 
-        self.messages = [{
-            'role': 'system',
-            'content': ORCHESTRATOR_PROMPT.format(agents)
-          }]
+        self._system_prompt = ORCHESTRATOR_PROMPT.format(agents)
+        self.clear_history()
 
         self.agent_messages = ""
         self._iterative_mode = True
