@@ -38,6 +38,7 @@ class BaseAgent(BaseModel):
     _complete: bool = PrivateAttr(default=False)
     _iterative_mode: bool = PrivateAttr(default=False)
     _system_prompt: str = PrivateAttr(default="You are a helpful assistant.")
+    _metadata: Dict = PrivateAttr(default={})
 
     @model_validator(mode='after')
     def check_fields(self) -> Self:
@@ -88,6 +89,9 @@ class BaseAgent(BaseModel):
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
 
+        if "tool_calls" not in self.metadata.keys():
+            self.metadata["tool_calls"] = []
+
         span = trace.get_current_span()
         span.set_attribute(SpanAttributes.TOOL_NAME,
                            function_name)
@@ -103,12 +107,38 @@ class BaseAgent(BaseModel):
                     result = func(**arguments)
                     span.set_attribute(SpanAttributes.OUTPUT_VALUE, result)
                     span.set_status(Status(StatusCode.OK))
+
+                    # Save result to metadata
+                    self.metadata["tool_calls"].append({
+                        "id": tool_id,
+                        "function": function_name,
+                        "arguments": arguments,
+                        "output": result,
+                        "status": "success"
+                    })
+
                     return tool_id, result
                 except Exception as e:
                     span.set_status(Status(StatusCode.ERROR))
+                    self.metadata["tool_calls"].append({
+                        "id": tool_id,
+                        "function": function_name,
+                        "arguments": arguments,
+                        "output": error_message,
+                        "status": "error"
+                    })
+
                     return tool_id, \
                         f"Error executing function '{function_name}': {e}"
 
+        error_message = f"Function '{function_name}' is not available."
+        self.metadata["tool_calls"].append({
+            "id": tool_id,
+            "function": function_name,
+            "arguments": arguments,
+            "output": error_message,
+            "status": "error"
+        })
         return tool_id, f"Function '{function_name}' is not available."
 
     def _process_tool_calls(self, tool_calls) -> Dict[str, Any]:
@@ -199,3 +229,14 @@ class BaseAgent(BaseModel):
     def add_history(self, messages):
         """Add history."""
         self.messages.extend(messages)
+
+    @property
+    def metadata(self) -> Dict:
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, value: Dict):
+        if not isinstance(value, dict):
+            raise ValueError("metadata must be a dictionary.")
+
+        self._metadata = value
