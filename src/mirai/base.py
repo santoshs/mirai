@@ -124,7 +124,7 @@ class BaseAgent(BaseModel):
                         "id": tool_id,
                         "function": function_name,
                         "arguments": arguments,
-                        "output": error_message,
+                        "output": str(e),
                         "status": "error"
                     })
 
@@ -162,7 +162,7 @@ class BaseAgent(BaseModel):
         if isinstance(response, str):
             # Handle error response
             self.messages.append({"role": "assistant", "content": response})
-            return response
+            return None
 
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
